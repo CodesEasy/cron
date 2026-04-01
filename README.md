@@ -86,7 +86,7 @@ Entry                  | Description                                | Equivalent
 c.AddFunc("@every 1m30s", func() { ... })
 ```
 
-`@every <duration>` schedules the job at a fixed interval, starting from when the cron is started. The duration string is parsed by Go's [`time.ParseDuration`](https://pkg.go.dev/time#ParseDuration).
+`@every <duration>` schedules the job at a fixed interval, starting from when the cron is started. The duration string is parsed by Go's [`time.ParseDuration`](https://pkg.go.dev/time#ParseDuration). The duration must be positive (e.g., `@every 0s` and `@every -1m` are rejected).
 
 > **Note:** The interval does not account for job runtime. If a job takes 3 minutes and is scheduled every 5 minutes, there will only be 2 minutes of idle time between runs.
 
