@@ -483,8 +483,8 @@ func parseDescriptor(descriptor string, loc *time.Location) (Schedule, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse duration %s: %s", descriptor, err)
 		}
-		if duration < 0 {
-			return nil, fmt.Errorf("negative duration is not allowed: %s", descriptor)
+		if duration <= 0 {
+			return nil, fmt.Errorf("non-positive duration is not allowed: %s", descriptor)
 		}
 		return Every(duration), nil
 	}

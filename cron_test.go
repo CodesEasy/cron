@@ -743,3 +743,61 @@ func TestWithChainOptOut(t *testing.T) {
 	}()
 	wrapped.Run()
 }
+
+func TestScheduleNilSchedulePanics(t *testing.T) {
+	c := New()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for nil Schedule")
+		}
+	}()
+	c.Schedule(nil, FuncJob(func() {}))
+}
+
+func TestScheduleNilJobPanics(t *testing.T) {
+	c := New()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic for nil Job")
+		}
+	}()
+	c.Schedule(Every(time.Second), nil)
+}
+
+func TestAddJobNilReturnsError(t *testing.T) {
+	c := New()
+	_, err := c.AddJob("@every 1s", nil)
+	if err == nil {
+		t.Error("expected error for nil Job")
+	}
+}
+
+func TestAddFuncNilReturnsError(t *testing.T) {
+	c := New()
+	_, err := c.AddFunc("@every 1s", nil)
+	if err == nil {
+		t.Error("expected error for nil func")
+	}
+}
+
+func TestLoggerOrphanKey(t *testing.T) {
+	// formatString with even count should produce correct pairs
+	fs2 := formatString(2)
+	if fs2 != "%s, %v=%v" {
+		t.Errorf("formatString(2) = %q, want \"%%s, %%v=%%v\"", fs2)
+	}
+
+	// formatString with odd count should include orphan as key=MISSING
+	fs3 := formatString(3)
+	expected := "%s, %v=%v, %v=MISSING"
+	if fs3 != expected {
+		t.Errorf("formatString(3) = %q, want %q", fs3, expected)
+	}
+
+	// formatString with 1 arg should produce single orphan
+	fs1 := formatString(1)
+	expected1 := "%s, %v=MISSING"
+	if fs1 != expected1 {
+		t.Errorf("formatString(1) = %q, want %q", fs1, expected1)
+	}
+}

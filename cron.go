@@ -2,6 +2,7 @@ package cron
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sync"
 	"time"
@@ -127,6 +128,9 @@ func (f FuncJob) Run() { f() }
 // The spec is parsed using the time zone of this Cron instance as the default.
 // An opaque ID is returned that can be used to later remove it.
 func (c *Cron) AddFunc(spec string, cmd func()) (EntryID, error) {
+	if cmd == nil {
+		return 0, fmt.Errorf("cron: nil func passed to AddFunc")
+	}
 	return c.AddJob(spec, FuncJob(cmd))
 }
 
@@ -134,6 +138,9 @@ func (c *Cron) AddFunc(spec string, cmd func()) (EntryID, error) {
 // The spec is parsed using the time zone of this Cron instance as the default.
 // An opaque ID is returned that can be used to later remove it.
 func (c *Cron) AddJob(spec string, cmd Job) (EntryID, error) {
+	if cmd == nil {
+		return 0, fmt.Errorf("cron: nil Job passed to AddJob")
+	}
 	schedule, err := c.parser.Parse(spec)
 	if err != nil {
 		return 0, err
@@ -143,7 +150,14 @@ func (c *Cron) AddJob(spec string, cmd Job) (EntryID, error) {
 
 // Schedule adds a Job to the Cron to be run on the given schedule.
 // The job is wrapped with the configured Chain.
+// It panics if schedule or cmd is nil.
 func (c *Cron) Schedule(schedule Schedule, cmd Job) EntryID {
+	if schedule == nil {
+		panic("cron: nil Schedule passed to Schedule")
+	}
+	if cmd == nil {
+		panic("cron: nil Job passed to Schedule")
+	}
 	c.runningMu.Lock()
 	defer c.runningMu.Unlock()
 	c.nextID++
@@ -354,11 +368,7 @@ func stopTimer(t *time.Timer) {
 }
 
 func (c *Cron) removeEntry(id EntryID) {
-	entries := make([]*Entry, 0, len(c.entries))
-	for _, e := range c.entries {
-		if e.ID != id {
-			entries = append(entries, e)
-		}
-	}
-	c.entries = entries
+	c.entries = slices.DeleteFunc(c.entries, func(e *Entry) bool {
+		return e.ID == id
+	})
 }

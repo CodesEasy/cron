@@ -133,10 +133,11 @@ func TestParseScheduleErrors(t *testing.T) {
 		{"TZ=UTC ", "missing fields after timezone"},
 		{"TZ=  ", "empty timezone"},
 
-		// Negative @every durations (Round 2)
-		{"@every -5m", "negative duration"},
-		{"@every -1s", "negative duration"},
-		{"@every -100ms", "negative duration"},
+		// Non-positive @every durations (Round 2)
+		{"@every -5m", "non-positive duration"},
+		{"@every -1s", "non-positive duration"},
+		{"@every -100ms", "non-positive duration"},
+		{"@every 0s", "non-positive duration"},
 
 		// Step validation (Phase 2.1)
 		{"*/90 * * * *", "step"},

@@ -70,6 +70,12 @@ func formatString(numKeysAndValues int) string {
 		}
 		sb.WriteString("%v=%v")
 	}
+	if numKeysAndValues%2 == 1 {
+		if numKeysAndValues > 1 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString("%v=MISSING")
+	}
 	return sb.String()
 }
 
