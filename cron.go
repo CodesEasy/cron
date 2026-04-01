@@ -87,17 +87,17 @@ func (e Entry) Valid() bool { return e.ID != 0 }
 //
 // Available Settings
 //
-//   Time Zone
-//     Description: The time zone in which schedules are interpreted
-//     Default:     time.Local
+//	Time Zone
+//	  Description: The time zone in which schedules are interpreted
+//	  Default:     time.Local
 //
-//   Parser
-//     Description: Parser converts cron spec strings into cron.Schedules.
-//     Default:     Accepts this spec: https://en.wikipedia.org/wiki/Cron
+//	Parser
+//	  Description: Parser converts cron spec strings into cron.Schedules.
+//	  Default:     Accepts this spec: https://en.wikipedia.org/wiki/Cron
 //
-//   Chain
-//     Description: Wrap submitted jobs to customize behavior.
-//     Default:     A chain that recovers panics and logs them to the configured logger (stdout by default).
+//	Chain
+//	  Description: Wrap submitted jobs to customize behavior.
+//	  Default:     A chain that recovers panics and logs them to the configured logger (stdout by default).
 //
 // See "cron.With*" to modify the default behavior.
 func New(opts ...Option) *Cron {
@@ -240,6 +240,35 @@ func (c *Cron) Run() {
 	c.run()
 }
 
+// compareEntries returns a comparison result for sorting entries by Next time.
+// Entries with a zero Next time are sorted to the end.
+func compareEntries(a, b *Entry) int {
+	if a.Next.IsZero() {
+		if b.Next.IsZero() {
+			return 0
+		}
+		return 1
+	}
+	if b.Next.IsZero() {
+		return -1
+	}
+	return a.Next.Compare(b.Next)
+}
+
+// fireDueEntries runs every entry whose scheduled time is at or before now,
+// updates each entry's Prev/Next times, and logs the invocation.
+func (c *Cron) fireDueEntries(now time.Time) {
+	for _, e := range c.entries {
+		if e.Next.After(now) || e.Next.IsZero() {
+			break
+		}
+		c.startJob(e.WrappedJob)
+		e.Prev = e.Next
+		e.Next = e.Schedule.Next(now)
+		c.logger.Info("run", "now", now, "entry", e.ID, "next", e.Next)
+	}
+}
+
 // run the scheduler.. this is private just due to the need to synchronize
 // access to the 'running' state variable.
 func (c *Cron) run() {
@@ -254,18 +283,7 @@ func (c *Cron) run() {
 
 	for {
 		// Determine the next entry to run.
-		slices.SortFunc(c.entries, func(a, b *Entry) int {
-			if a.Next.IsZero() {
-				if b.Next.IsZero() {
-					return 0
-				}
-				return 1
-			}
-			if b.Next.IsZero() {
-				return -1
-			}
-			return a.Next.Compare(b.Next)
-		})
+		slices.SortFunc(c.entries, compareEntries)
 
 		var timer *time.Timer
 		if len(c.entries) == 0 || c.entries[0].Next.IsZero() {
@@ -281,17 +299,7 @@ func (c *Cron) run() {
 			case now = <-timer.C:
 				now = now.In(c.location)
 				c.logger.Info("wake", "now", now)
-
-				// Run every entry whose next time was less than now
-				for _, e := range c.entries {
-					if e.Next.After(now) || e.Next.IsZero() {
-						break
-					}
-					c.startJob(e.WrappedJob)
-					e.Prev = e.Next
-					e.Next = e.Schedule.Next(now)
-					c.logger.Info("run", "now", now, "entry", e.ID, "next", e.Next)
-				}
+				c.fireDueEntries(now)
 
 			case newEntry := <-c.add:
 				stopTimer(timer)

@@ -63,18 +63,17 @@ type Parser struct {
 //
 // Examples
 //
-//  // Standard parser without descriptors
-//  specParser := NewParser(Minute | Hour | Dom | Month | Dow)
-//  sched, err := specParser.Parse("0 0 15 */3 *")
+//	// Standard parser without descriptors
+//	specParser := NewParser(Minute | Hour | Dom | Month | Dow)
+//	sched, err := specParser.Parse("0 0 15 */3 *")
 //
-//  // Same as above, just excludes time fields
-//  specParser := NewParser(Dom | Month | Dow)
-//  sched, err := specParser.Parse("15 */3 *")
+//	// Same as above, just excludes time fields
+//	specParser := NewParser(Dom | Month | Dow)
+//	sched, err := specParser.Parse("15 */3 *")
 //
-//  // Same as above, just makes Dow optional
-//  specParser := NewParser(Dom | Month | DowOptional)
-//  sched, err := specParser.Parse("15 */3")
-//
+//	// Same as above, just makes Dow optional
+//	specParser := NewParser(Dom | Month | DowOptional)
+//	sched, err := specParser.Parse("15 */3")
 func NewParser(options ParseOption) Parser {
 	optionals := 0
 	if options&DowOptional > 0 {
@@ -294,48 +293,42 @@ func getField(field string, r bounds) (uint64, error) {
 	return bits, nil
 }
 
-// getRange returns the bits indicated by the given expression:
-//   number | number "-" number [ "/" number ]
-// or error parsing range.
-func getRange(expr string, r bounds) (uint64, error) {
-	var (
-		start, end, step uint
-		rangeAndStep     = strings.Split(expr, "/")
-		lowAndHigh       = strings.Split(rangeAndStep[0], "-")
-		singleDigit      = len(lowAndHigh) == 1
-		err              error
-	)
-
-	var extra uint64
+// parseRangeBounds parses the start, end, and star-bit from the range portion
+// of a cron field expression (e.g. "*", "1-5", "3"). The expr parameter is
+// used only for error messages.
+func parseRangeBounds(expr string, lowAndHigh []string, r bounds) (start, end uint, extra uint64, err error) {
 	if lowAndHigh[0] == "*" || lowAndHigh[0] == "?" {
-		start = r.min
-		end = r.max
-		extra = starBit
-	} else {
-		start, err = parseIntOrName(lowAndHigh[0], r.names)
-		if err != nil {
-			return 0, err
-		}
-		switch len(lowAndHigh) {
-		case 1:
-			end = start
-		case 2:
-			end, err = parseIntOrName(lowAndHigh[1], r.names)
-			if err != nil {
-				return 0, err
-			}
-		default:
-			return 0, fmt.Errorf("too many hyphens: %s", expr)
-		}
+		return r.min, r.max, starBit, nil
 	}
+	start, err = parseIntOrName(lowAndHigh[0], r.names)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	switch len(lowAndHigh) {
+	case 1:
+		end = start
+	case 2:
+		end, err = parseIntOrName(lowAndHigh[1], r.names)
+		if err != nil {
+			return 0, 0, 0, err
+		}
+	default:
+		return 0, 0, 0, fmt.Errorf("too many hyphens: %s", expr)
+	}
+	return start, end, 0, nil
+}
 
+// parseStep parses the step value from the range expression and adjusts end
+// and extra for the "N/step" shorthand. The expr parameter is used only for
+// error messages.
+func parseStep(expr string, rangeAndStep []string, singleDigit bool, end uint, extra uint64, r bounds) (step, newEnd uint, newExtra uint64, err error) {
 	switch len(rangeAndStep) {
 	case 1:
-		step = 1
+		return 1, end, extra, nil
 	case 2:
 		step, err = mustParseInt(rangeAndStep[1])
 		if err != nil {
-			return 0, err
+			return 0, 0, 0, err
 		}
 
 		// Special handling: "N/step" means "N-max/step".
@@ -345,8 +338,30 @@ func getRange(expr string, r bounds) (uint64, error) {
 		if step > 1 {
 			extra = 0
 		}
+		return step, end, extra, nil
 	default:
-		return 0, fmt.Errorf("too many slashes: %s", expr)
+		return 0, 0, 0, fmt.Errorf("too many slashes: %s", expr)
+	}
+}
+
+// getRange returns the bits indicated by the given expression:
+//
+//	number | number "-" number [ "/" number ]
+//
+// or error parsing range.
+func getRange(expr string, r bounds) (uint64, error) {
+	rangeAndStep := strings.Split(expr, "/")
+	lowAndHigh := strings.Split(rangeAndStep[0], "-")
+	singleDigit := len(lowAndHigh) == 1
+
+	start, end, extra, err := parseRangeBounds(expr, lowAndHigh, r)
+	if err != nil {
+		return 0, err
+	}
+
+	step, end, extra, err := parseStep(expr, rangeAndStep, singleDigit, end, extra, r)
+	if err != nil {
+		return 0, err
 	}
 
 	if start < r.min {
