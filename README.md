@@ -1,4 +1,5 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/codeseasy/cron.svg)](https://pkg.go.dev/github.com/codeseasy/cron)
+[![Go Report Card](https://goreportcard.com/badge/github.com/codeseasy/cron)](https://goreportcard.com/report/github.com/codeseasy/cron)
 
 # cron
 
