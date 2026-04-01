@@ -154,6 +154,16 @@ job = cron.NewChain(
 ).Then(job)
 ```
 
+### Validation
+
+You can validate a cron spec without scheduling it:
+
+```go
+if err := cron.ValidateSpec("0 */2 * * *"); err != nil {
+    log.Fatal(err)
+}
+```
+
 ### Thread Safety
 
 All cron methods (`AddFunc`, `Remove`, `Entries`, `Start`, `Stop`) are safe to call from multiple goroutines.
